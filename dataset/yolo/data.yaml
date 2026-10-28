@@ -1,0 +1,20 @@
+path: dataset/yolo
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: canned food
+  1: cooked chicken
+  2: dumpling
+  3: egg
+  4: fish
+  5: fruits
+  6: lemon
+  7: meat
+  8: milk
+  9: pate
+  10: rice noodle
+  11: tomato
+  12: vegetable
+  13: yogurt

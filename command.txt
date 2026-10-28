@@ -1,0 +1,59 @@
+# sending image into destination based on available labels in the folder
+$source = "dataset/reviewed/keep"
+$labels = "dataset/yolo/labels/val"
+$destination = "dataset/yolo/images/val"
+
+$imageByName = @{}
+Get-ChildItem $source -File |
+    Where-Object { $_.Extension -match '^\.(jpg|jpeg|png|bmp|webp)$' } |
+    ForEach-Object { $imageByName[$_.BaseName] = $_ }
+
+Get-ChildItem $labels -Filter "*.txt" -File | ForEach-Object {
+    $image = $imageByName[$_.BaseName]
+    if (-not $image) {
+        Write-Warning "No matching image for $($_.Name)"
+        return
+    }
+
+    $target = Join-Path $destination $image.Name
+    if (Test-Path -LiteralPath $target) {
+        Write-Host "Skipping existing image: $($image.Name)"
+    } else {
+        Copy-Item -LiteralPath $image.FullName -Destination $target -WhatIf
+    }
+}
+
+# remove image from the folder into archive based on label
+$images = "dataset/yolo/images/train"
+$labels = "dataset/yolo/labels/train"
+$archive = "dataset/yolo/unlabeled_images"
+
+$labelNames = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+)
+Get-ChildItem -LiteralPath $labels -Filter "*.txt" -File |
+    ForEach-Object { $null = $labelNames.Add($_.BaseName) }
+
+$orphans = @(
+    Get-ChildItem -LiteralPath $images -File |
+        Where-Object {
+            $_.Extension -match '^\.(jpg|jpeg|png|bmp|webp)$' -and
+            -not $labelNames.Contains($_.BaseName)
+        }
+)
+
+Write-Host "Images without matching labels: $($orphans.Count)"
+$orphans | ForEach-Object { Write-Host "  $($_.Name)" }
+
+if ($orphans.Count -gt 0) {
+    $confirmation = Read-Host "Type MOVE to archive these images"
+    if ($confirmation -ceq "MOVE") {
+        New-Item -ItemType Directory -Path $archive -Force | Out-Null
+        $orphans | Move-Item -Destination $archive
+        Write-Host "Moved $($orphans.Count) image(s) to $archive"
+    } else {
+        Write-Host "No images moved."
+    }
+}
+
+yolo detect predict model="runs/detect/runs/freshai_baseline-2/weights/best.pt" source="path.jpg" imgsz=640 conf=0.25 save=True
